@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalkulator Perjalanan: Bandung - Merbabu (Thekelan)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Earthy Harmony -->
+    <!-- Application Structure Plan: Aplikasi ini dirancang sebagai kalkulator perjalanan interaktif, bukan sebagai laporan statis. Strukturnya terdiri dari tiga bagian utama: 1) Panel Konfigurasi di bagian atas, memungkinkan pengguna memilih rute utama (kereta atau bus) dan opsi spesifiknya. Pilihan ini secara langsung mengubah konten di bawah. 2) Tampilan Rencana Perjalanan Dinamis, yang menyajikan rute langkah-demi-langkah dalam bentuk kartu visual yang diperbarui secara real-time. 3) Dasbor Ringkasan, menampilkan visualisasi biaya melalui diagram donat (Chart.js) dan total biaya/waktu yang dihitung. Struktur ini dipilih karena mengubah pengguna dari pembaca pasif menjadi perencana aktif, memberikan jawaban yang dipersonalisasi dan instan sesuai kebutuhan mereka untuk merencanakan perjalanan yang efisien dan hemat biaya. -->
+    <!-- Visualization & Content Choices: 1) Opsi Transportasi Utama (Kereta vs. Bus): Direpresentasikan sebagai Tombol Pilihan (mirip radio button) untuk keputusan awal yang jelas. Interaksi: Mengklik akan memfilter seluruh set data perjalanan. 2) Rincian Rute (contoh: Pilihan Kereta): Menggunakan Dropdown untuk pemilihan sekunder. Interaksi: Memperbarui biaya, waktu, dan label dalam rencana perjalanan. 3) Rencana Perjalanan Langkah-demi-Langkah: Menggunakan Kartu Informasi (HTML/Tailwind) yang dibuat secara dinamis untuk memvisualisasikan alur perjalanan. 4) Rincian Biaya: Menggunakan Diagram Donat (Chart.js) untuk memvisualisasikan proporsi pengeluaran (transportasi utama, transportasi lokal, registrasi). Interaksi: Diagram diperbarui setiap kali konfigurasi diubah. Pilihan ini mengubah data numerik yang padat menjadi wawasan visual yang mudah dicerna dan rencana yang dapat ditindaklanjuti. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .smooth-transition {
+            transition: all 0.3s ease-in-out;
+        }
+        .step-connector {
+            position: absolute;
+            left: 50%;
+            top: 100%;
+            width: 2px;
+            height: 2rem;
+            background-color: #cbd5e1; /* slate-300 */
+            transform: translateX(-50%);
+        }
+         .chart-container {
+            position: relative;
+            margin: auto;
+            height: 320px;
+            width: 100%;
+            max-width: 400px;
+        }
+    </style>
+</head>
+<body class="text-slate-700">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+
+        <header class="text-center mb-8 md:mb-12">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-800 mb-2">Perencana Perjalanan ke Gn. Merbabu</h1>
+            <p class="text-slate-500 max-w-2xl mx-auto">Dari Bandung via Thekelan. Konfigurasikan perjalanan Anda di bawah ini untuk melihat estimasi biaya dan rencana perjalanan pulang-pergi yang disesuaikan.</p>
+        </header>
+
+        <main>
+            <!-- Bagian Konfigurasi -->
+            <section id="config-section" class="bg-white p-6 rounded-xl shadow-lg mb-8 border border-slate-200">
+                <h2 class="text-xl font-bold text-slate-800 mb-4">1. Atur Rencana Perjalanan Anda</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="font-semibold text-slate-600 mb-2 block">Pilih Transportasi Utama dari Bandung:</label>
+                        <div id="transport-choice" class="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
+                            <button data-value="kereta" class="transport-option bg-emerald-600 text-white font-semibold py-2 rounded-md smooth-transition">Kereta Api</button>
+                            <button data-value="bus" class="transport-option bg-transparent text-slate-600 font-semibold py-2 rounded-md smooth-transition">Bus Langsung</button>
+                        </div>
+                    </div>
+                    <div id="kereta-options" class="smooth-transition">
+                        <label for="kereta-select" class="font-semibold text-slate-600 mb-2 block">Pilih Rute & Kelas Kereta:</label>
+                        <select id="kereta-select" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                            <option value="kahuripan-solo">KA Kahuripan (Ekonomi) ke Solo</option>
+                            <option value="lodaya-solo">KA Lodaya (Ekonomi) ke Solo</option>
+                            <option value="lodaya-yk">KA Lodaya (Ekonomi) ke Yogyakarta</option>
+                             <option value="argo-wilis-yk">KA Argo Wilis (Eksekutif) ke Yogyakarta</option>
+                        </select>
+                    </div>
+                    <div id="bus-options" class="hidden smooth-transition">
+                         <label for="bus-select" class="font-semibold text-slate-600 mb-2 block">Pilih Rute Bus Langsung:</label>
+                        <select id="bus-select" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                            <option value="bus-salatiga">Bus ke Salatiga (Cepat)</option>
+                            <option value="bus-magelang">Bus ke Magelang</option>
+                            <option value="bus-boyolali">Bus ke Boyolali</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Bagian Rincian Perjalanan -->
+            <section id="plan-details" class="mb-8">
+                <h2 class="text-xl font-bold text-slate-800 mb-4">2. Rincian Perjalanan (Pergi)</h2>
+                <p class="text-slate-500 mb-6">Berikut adalah rincian tahapan perjalanan satu arah berdasarkan pilihan Anda. Total biaya di bawah ini sudah dihitung untuk pulang-pergi.</p>
+                <div id="itinerary-steps" class="flex flex-col items-center space-y-8 md:space-y-0 md:flex-row md:justify-center md:space-x-4 md:items-start">
+                    <!-- Steps will be generated by JS -->
+                </div>
+            </section>
+
+            <!-- Bagian Ringkasan & Visualisasi -->
+            <section id="summary-section" class="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+                 <h2 class="text-xl font-bold text-slate-800 mb-6 text-center">3. Ringkasan Biaya & Waktu</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                    <div class="flex flex-col space-y-4">
+                        <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-lg text-center">
+                            <h3 class="text-lg font-semibold text-emerald-800">Estimasi Total Biaya (PP)</h3>
+                            <p id="total-cost" class="text-3xl font-bold text-emerald-700 mt-1">Rp 0</p>
+                            <p class="text-sm text-emerald-600">Termasuk registrasi, belum termasuk dana darurat.</p>
+                        </div>
+                         <div class="bg-sky-50 border border-sky-200 p-4 rounded-lg text-center">
+                            <h3 class="text-lg font-semibold text-sky-800">Estimasi Total Waktu (Pergi)</h3>
+                            <p id="total-time" class="text-3xl font-bold text-sky-700 mt-1">0 jam</p>
+                            <p class="text-sm text-sky-600">Tidak termasuk waktu tunggu/transfer.</p>
+                        </div>
+                        <div class="text-center p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <p class="text-amber-800 font-medium">💡 Rekomendasi: Siapkan dana darurat minimal <strong id="contingency-fund">Rp 0</strong> (20% dari total biaya).</p>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-800 mb-2 text-center">Alokasi Biaya Perjalanan</h3>
+                        <div class="chart-container">
+                            <canvas id="cost-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <footer class="text-center mt-12">
+            <p class="text-slate-400 text-sm">Aplikasi dibuat berdasarkan data riset untuk perjalanan dari Bandung ke Gn. Merbabu via Thekelan.</p>
+        </footer>
+    </div>
+
+    <script>
+        const tripData = {
+            kereta: {
+                'kahuripan-solo': {
+                    name: 'KA Kahuripan (Ekonomi)',
+                    to: 'Solo',
+                    cost: 80000,
+                    time: 9,
+                    next: 'solo-salatiga'
+                },
+                'lodaya-solo': {
+                    name: 'KA Lodaya (Ekonomi)',
+                    to: 'Solo',
+                    cost: 203000,
+                    time: 7.7,
+                    next: 'solo-salatiga'
+                },
+                'lodaya-yk': {
+                    name: 'KA Lodaya (Ekonomi)',
+                    to: 'Yogyakarta',
+                    cost: 203000,
+                    time: 6.3,
+                    next: 'yk-salatiga'
+                },
+                'argo-wilis-yk': {
+                    name: 'KA Argo Wilis (Eksekutif)',
+                    to: 'Yogyakarta',
+                    cost: 485000,
+                    time: 5.8,
+                    next: 'yk-salatiga'
+                },
+            },
+            bus: {
+                'bus-salatiga': {
+                    name: 'Bus Cepat',
+                    to: 'Salatiga',
+                    cost: 203000,
+                    time: 5.5,
+                    next: 'salatiga-kopeng'
+                },
+                'bus-magelang': {
+                    name: 'Bus',
+                    to: 'Magelang',
+                    cost: 153000,
+                    time: 9.6,
+                    next: 'magelang-kopeng'
+                },
+                'bus-boyolali': {
+                    name: 'Bus',
+                    to: 'Boyolali',
+                    cost: 150000,
+                    time: 5.7,
+                    next: 'boyolali-kopeng' // Simplified for planning
+                }
+            },
+            lanjutan: {
+                'solo-salatiga': {
+                    name: 'Kereta + Bus',
+                    from: 'Solo',
+                    to: 'Salatiga',
+                    cost: 31000,
+                    time: 2.1,
+                    next: 'salatiga-kopeng',
+                    map: 'https://maps.app.goo.gl/o1b6e1b69', // Generic Solo
+                    booking: 'https://www.traveloka.com/id-id/kereta-api'
+                },
+                'yk-salatiga': {
+                    name: 'Bus/Shuttle',
+                    from: 'Yogyakarta',
+                    to: 'Salatiga',
+                    cost: 68000,
+                    time: 2.25,
+                    next: 'salatiga-kopeng',
+                    map: 'https://maps.app.goo.gl/354Bw57x2Vw6e1b69', // Generic Yogya
+                    booking: 'https://www.traveloka.com/id-id/bus-and-shuttle'
+                },
+                'salatiga-kopeng': {
+                    name: 'Angkot',
+                    from: 'Salatiga',
+                    to: 'Kopeng',
+                    cost: 6400,
+                    time: 0.75,
+                    next: 'kopeng-basecamp',
+                    map: 'https://maps.app.goo.gl/o1b6e1b69', // Generic Salatiga
+                },
+                'magelang-kopeng': {
+                    name: 'Bus Kecil',
+                    from: 'Magelang',
+                    to: 'Kopeng',
+                    cost: 10000, // Estimated
+                    time: 0.75,
+                    next: 'kopeng-basecamp',
+                    map: 'https://maps.app.goo.gl/o1b6e1b69', // Generic Magelang
+                },
+                 'boyolali-kopeng': {
+                    name: 'Transportasi Lokal',
+                    from: 'Boyolali',
+                    to: 'Kopeng',
+                    cost: 20000, // Estimated
+                    time: 1,
+                    next: 'kopeng-basecamp',
+                    map: 'https://maps.app.goo.gl/o1b6e1b69', // Generic Boyolali
+                },
+                'kopeng-basecamp': {
+                    name: 'Ojek Lokal',
+                    from: 'Kopeng',
+                    to: 'Basecamp Thekelan',
+                    cost: 40000,
+                    time: 0.15,
+                    next: null,
+                    map: 'https://maps.app.goo.gl/o1b6e1b69' // Thekelan
+                }
+            },
+            registrasi: {
+                cost: 17500
+            },
+            links: {
+                kai: 'https://apps.kereta-api.co.id/',
+                bus: 'https://www.redbus.id/',
+                bandungStation: 'https://maps.app.goo.gl/354Bw57x2Vw6e1b69'
+            }
+        };
+
+        let costChart;
+
+        const formatRupiah = (number) => {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0
+            }).format(number);
+        };
+        
+        const formatJam = (number) => {
+            const hours = Math.floor(number);
+            const minutes = Math.round((number - hours) * 60);
+            return `${hours} jam ${minutes} mnt`;
+        }
+
+        const createStepCard = (icon, title, details, cost, time, mapLink, bookingLink, isLast = false) => {
+            const mapButton = mapLink ? `<a href="${mapLink}" target="_blank" class="bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-1 rounded hover:bg-blue-200">Peta</a>` : '';
+            const bookingButton = bookingLink ? `<a href="${bookingLink}" target="_blank" class="bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded hover:bg-green-200">Booking</a>` : '';
+            const connector = isLast ? '' : '<div class="step-connector"></div>';
+            
+            return `
+                <div class="relative w-full max-w-xs md:max-w-none md:w-auto md:flex-1">
+                    <div class="bg-white border border-slate-200 rounded-lg p-4 text-center shadow-sm h-full flex flex-col justify-between">
+                        <div>
+                            <div class="text-3xl mb-2">${icon}</div>
+                            <h4 class="font-bold text-slate-800 text-sm">${title}</h4>
+                            <p class="text-xs text-slate-500 mb-3">${details}</p>
+                        </div>
+                        <div>
+                            <div class="text-sm font-semibold text-emerald-600">${formatRupiah(cost)}</div>
+                            <div class="text-xs text-sky-600 mb-3">${formatJam(time)}</div>
+                            <div class="flex justify-center space-x-2">
+                                ${mapButton}
+                                ${bookingButton}
+                            </div>
+                        </div>
+                    </div>
+                    ${connector}
+                </div>
+            `;
+        };
+
+        const updatePlan = () => {
+            const transportChoice = document.querySelector('.transport-option.bg-emerald-600').dataset.value;
+            const itineraryStepsEl = document.getElementById('itinerary-steps');
+            itineraryStepsEl.innerHTML = '';
+            
+            let currentStepData;
+            let currentStepKey;
+            let totalCost = 0;
+            let totalTime = 0;
+            let transportCost = 0;
+            let localTransportCost = 0;
+            const steps = [];
+
+            if (transportChoice === 'kereta') {
+                const keretaChoice = document.getElementById('kereta-select').value;
+                currentStepData = tripData.kereta[keretaChoice];
+                currentStepKey = currentStepData.next;
+
+                steps.push({
+                    icon: '🚂',
+                    title: `Bandung → ${currentStepData.to}`,
+                    details: currentStepData.name,
+                    cost: currentStepData.cost,
+                    time: currentStepData.time,
+                    mapLink: tripData.links.bandungStation,
+                    bookingLink: tripData.links.kai
+                });
+                transportCost += currentStepData.cost;
+                totalTime += currentStepData.time;
+
+            } else { // bus
+                const busChoice = document.getElementById('bus-select').value;
+                currentStepData = tripData.bus[busChoice];
+                currentStepKey = currentStepData.next;
+
+                steps.push({
+                    icon: '🚌',
+                    title: `Bandung → ${currentStepData.to}`,
+                    details: currentStepData.name,
+                    cost: currentStepData.cost,
+                    time: currentStepData.time,
+                    mapLink: tripData.links.bandungStation, // Generic departure point
+                    bookingLink: tripData.links.bus
+                });
+                transportCost += currentStepData.cost;
+                totalTime += currentStepData.time;
+            }
+
+            while (currentStepKey) {
+                const stepData = tripData.lanjutan[currentStepKey];
+                let icon = '🚐';
+                if(stepData.name.includes('Ojek')) icon = '🛵';
+                if(stepData.name.includes('Angkot')) icon = '🚗';
+
+                steps.push({
+                    icon: icon,
+                    title: `${stepData.from} → ${stepData.to}`,
+                    details: stepData.name,
+                    cost: stepData.cost,
+                    time: stepData.time,
+                    mapLink: stepData.map,
+                    bookingLink: stepData.booking
+                });
+
+                localTransportCost += stepData.cost;
+                totalTime += stepData.time;
+                currentStepKey = stepData.next;
+            }
+            
+            steps.forEach((step, index) => {
+                 itineraryStepsEl.innerHTML += createStepCard(
+                    step.icon, 
+                    step.title, 
+                    step.details, 
+                    step.cost, 
+                    step.time, 
+                    step.mapLink, 
+                    step.bookingLink,
+                    index === steps.length - 1
+                );
+            });
+
+
+            totalCost = (transportCost + localTransportCost) * 2 + tripData.registrasi.cost;
+
+            document.getElementById('total-cost').innerText = formatRupiah(totalCost);
+            document.getElementById('total-time').innerText = formatJam(totalTime);
+            document.getElementById('contingency-fund').innerText = formatRupiah(totalCost * 0.2);
+            
+            updateChart(transportCost, localTransportCost, tripData.registrasi.cost);
+        };
+
+        const updateChart = (transportCost, localTransportCost, registrationCost) => {
+            const totalTransport = (transportCost + localTransportCost) * 2;
+            costChart.data.labels = ['Transportasi PP', 'Registrasi'];
+            costChart.data.datasets[0].data = [totalTransport, registrationCost];
+            costChart.update();
+        };
+
+        const setupEventListeners = () => {
+            document.querySelectorAll('.transport-option').forEach(button => {
+                button.addEventListener('click', () => {
+                    document.querySelector('.transport-option.bg-emerald-600').classList.replace('bg-emerald-600', 'bg-transparent');
+                    document.querySelector('.transport-option.bg-transparent').classList.add('text-slate-600');
+                    button.classList.replace('bg-transparent', 'bg-emerald-600');
+                    button.classList.remove('text-slate-600');
+
+                    const choice = button.dataset.value;
+                    if (choice === 'kereta') {
+                        document.getElementById('kereta-options').style.display = 'block';
+                        document.getElementById('bus-options').style.display = 'none';
+                    } else {
+                        document.getElementById('kereta-options').style.display = 'none';
+                        document.getElementById('bus-options').style.display = 'block';
+                    }
+                    updatePlan();
+                });
+            });
+
+            document.getElementById('kereta-select').addEventListener('change', updatePlan);
+            document.getElementById('bus-select').addEventListener('change', updatePlan);
+        };
+
+        const initializeChart = () => {
+            const ctx = document.getElementById('cost-chart').getContext('2d');
+            costChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Alokasi Biaya',
+                        data: [],
+                        backgroundColor: [
+                            'rgb(16, 185, 129)', // emerald-500
+                            'rgb(56, 189, 248)'  // sky-400
+                        ],
+                        borderColor: '#f8fafc',
+                        borderWidth: 4,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                font: {
+                                    size: 14,
+                                    family: 'Inter'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += formatRupiah(context.parsed);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '60%'
+                }
+            });
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeChart();
+            setupEventListeners();
+            updatePlan(); 
+        });
+
+    </script>
+</body>
+</html>
